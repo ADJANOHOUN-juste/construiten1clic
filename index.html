@@ -145,43 +145,43 @@
 
     <div class="cat-grid">
       <a href="#" class="cat-card">
-        <div class="cat-icon"><img src="images.jpeg" alt="Image"></div>
+        <div class="cat-icon"><img src="image/images.jpeg" alt="Ciment"></div>
         <h3>Ciment</h3>
         <span>CPJ, CPA, chaux</span>
         <span class="cat-price">À partir de 3 750 FCFA le sac de 50 kg</span>
       </a>
       <a href="#" class="cat-card">
-        <div class="cat-icon"><img src="tuiles .jpeg" alt="Tuiles"></div>
+        <div class="cat-icon"><img src="image/tuiles .jpeg" alt="Tuiles"></div>
         <h3>Tuiles</h3>
         <span>Terre cuite, béton</span>
         <span class="cat-price">À partir de 2 250 FCFA</span>
       </a>
       <a href="#" class="cat-card">
-        <div class="cat-icon"><img src="Peinture.jpeg" alt="Peinture"></div>
+        <div class="cat-icon"><img src="image/Peinture.jpeg" alt="Peinture"></div>
         <h3>Peinture</h3>
         <span>Intérieur, façade</span>
         <span class="cat-price">À partir de 22 000 FCFA</span>
       </a>
       <a href="#" class="cat-card">
-        <div class="cat-icon"><img src="Carreaux.jpeg" alt="Carreaux"></div>
+        <div class="cat-icon"><img src="image/Carreaux.jpeg" alt="Carreaux"></div>
         <h3>Carreaux</h3>
         <span>Sol, mur, grès</span>
         <span class="cat-price">À partir de 2 500 FCFA </span>
       </a>
       <a href="#" class="cat-card">
-        <div class="cat-icon"><img src="robineterrie.jpeg" alt="Robinetterie"></div>
+        <div class="cat-icon"><img src="image/robineterrie.jpeg" alt="Robinetterie"></div>
         <h3>Robinetterie</h3>
         <span>Mitigeurs, sanitaires</span>
         <span class="cat-price">À partir de 8 500 FCFA</span>
       </a>
       <a href="#" class="cat-card">
-        <div class="cat-icon"><img src="mabre.jpeg" alt="Marbre"></div>
+        <div class="cat-icon"><img src="image/mabre.jpeg" alt="Marbre"></div>
         <h3>Marbre</h3>
         <span>Plaques, veinés</span>
         <span class="cat-price">À partir de 15 000 FCFA</span>
       </a>
       <a href="#" class="cat-card">
-        <div class="cat-icon"><img src="outillage.jpeg" alt="Outillage"></div>
+        <div class="cat-icon"><img src="image/outillage.jpeg" alt="Outillage"></div>
         <h3>Outillage</h3>
         <span>Main, électroportatif</span>
         <span class="cat-price">À partir de 2 000 FCFA</span>
@@ -347,6 +347,404 @@
   </svg>
 </a>
 
-<script src="script.js"></script>
+<script>
+/* ===================================================================
+   construiten1cli — script.js
+   Comportements : recherche produits, compteur panier,
+   envoi du formulaire de devis (Web3Forms + WhatsApp), petites UX (scroll header).
+   =================================================================== */
+
+document.addEventListener('DOMContentLoaded', function () {
+
+  /* -----------------------------------------------------------
+     1. RECHERCHE PRODUITS
+  ----------------------------------------------------------- */
+  var searchForm = document.getElementById('search-form');
+  var searchInput = document.getElementById('search-input');
+  var catSelect = document.getElementById('cat-select');
+
+  if (searchForm) {
+    searchForm.addEventListener('submit', function (e) {
+      e.preventDefault();
+
+      var query = searchInput.value.trim();
+      var category = catSelect.value;
+
+      if (query === '') {
+        searchInput.focus();
+        return;
+      }
+
+      var params = new URLSearchParams();
+      params.set('q', query);
+      if (category && category !== 'Toutes catégories') {
+        params.set('categorie', category);
+      }
+
+      window.location.href = 'recherche.php?' + params.toString();
+    });
+  }
+
+  /* -----------------------------------------------------------
+     2. PANIER
+  ----------------------------------------------------------- */
+  var cartCountEl = document.getElementById('cart-count');
+  var cartLinkEl = document.getElementById('cart-link');
+  var CART_ITEMS_KEY = 'c1c_cart_items';
+  var CART_CLICKS_KEY = 'c1c_cart_clicks';
+
+  var memoryClickCount = 0;
+  var memoryCartItems = [];
+
+  function storageAvailable() {
+    try {
+      return typeof window !== 'undefined' && !!window.sessionStorage;
+    } catch (err) {
+      return false;
+    }
+  }
+
+  function raf(fn) {
+    if (typeof window.requestAnimationFrame === 'function') {
+      window.requestAnimationFrame(fn);
+    } else {
+      setTimeout(fn, 16);
+    }
+  }
+
+  function showCartNotification(message) {
+    if (!cartLinkEl) return;
+
+    var bubble = cartLinkEl.querySelector('.cart-bubble');
+    if (!bubble) {
+      bubble = document.createElement('span');
+      bubble.className = 'cart-bubble';
+      bubble.setAttribute('role', 'status');
+      bubble.setAttribute('aria-live', 'polite');
+      cartLinkEl.appendChild(bubble);
+    }
+
+    bubble.textContent = message;
+
+    clearTimeout(bubble._hideTimeout);
+
+    raf(function () {
+      bubble.className = 'cart-bubble is-visible';
+    });
+
+    bubble._hideTimeout = setTimeout(function () {
+      bubble.className = 'cart-bubble';
+    }, 2000);
+
+    cartLinkEl.className = cartLinkEl.className.replace(/\s*cart-flash\s*/g, ' ');
+    void cartLinkEl.offsetWidth;
+    cartLinkEl.className += ' cart-flash';
+  }
+
+  function getCartItems() {
+    if (!storageAvailable()) return memoryCartItems;
+    try {
+      var stored = sessionStorage.getItem(CART_ITEMS_KEY);
+      return stored ? JSON.parse(stored) : [];
+    } catch (err) {
+      return memoryCartItems;
+    }
+  }
+
+  function saveCartItems(items) {
+    memoryCartItems = items;
+    if (storageAvailable()) {
+      try {
+        sessionStorage.setItem(CART_ITEMS_KEY, JSON.stringify(items));
+      } catch (err) {
+        // stockage indisponible : on continue avec la mémoire vive
+      }
+    }
+  }
+
+  function getClickCount() {
+    if (!storageAvailable()) return memoryClickCount;
+    try {
+      var stored = sessionStorage.getItem(CART_CLICKS_KEY);
+      return stored ? parseInt(stored, 10) : memoryClickCount;
+    } catch (err) {
+      return memoryClickCount;
+    }
+  }
+
+  function setClickCount(count) {
+    memoryClickCount = count;
+
+    if (storageAvailable()) {
+      try {
+        sessionStorage.setItem(CART_CLICKS_KEY, count);
+      } catch (err) {
+        // stockage indisponible : on continue avec la mémoire vive
+      }
+    }
+
+    if (cartCountEl) {
+      cartCountEl.textContent = count;
+    }
+  }
+
+  function renderCartCount() {
+    setClickCount(getClickCount());
+  }
+
+  renderCartCount();
+
+  window.addToCart = function (productId, quantity, productInfo) {
+    quantity = quantity || 1;
+
+    var items = getCartItems();
+    var existing = null;
+    for (var i = 0; i < items.length; i++) {
+      if (items[i].id === productId) {
+        existing = items[i];
+        break;
+      }
+    }
+
+    if (existing) {
+      existing.quantity += quantity;
+    } else {
+      items.push({
+        id: productId,
+        name: (productInfo && productInfo.name) || productId,
+        price: (productInfo && productInfo.price) || 0,
+        image: (productInfo && productInfo.image) || '',
+        quantity: quantity
+      });
+    }
+
+    var clicksForThisProduct = existing ? existing.quantity : quantity;
+
+    saveCartItems(items);
+
+    var newClickCount = getClickCount() + 1;
+    setClickCount(newClickCount);
+
+    if (cartCountEl) {
+      cartCountEl.className = cartCountEl.className.replace(/\s*bump\s*/g, ' ');
+      void cartCountEl.offsetWidth;
+      cartCountEl.className += ' bump';
+    }
+
+    var label = (productInfo && productInfo.name) ? productInfo.name : 'Produit';
+    showCartNotification(label + ' ajouté ✓ (×' + clicksForThisProduct + ')');
+  };
+
+  window.getCart = function () {
+    return getCartItems();
+  };
+
+  /* -----------------------------------------------------------
+     2bis. BOUTON "AJOUTER AU PANIER" SUR CHAQUE PRODUIT
+  ----------------------------------------------------------- */
+  var productCards = document.querySelectorAll('.cat-card');
+
+  if (!productCards.length) {
+    console.warn('construiten1clic : aucune carte .cat-card trouvée — le bouton "Ajouter au panier" ne peut pas être inséré.');
+  }
+
+  function slugify(text) {
+    var result = text.toString().toLowerCase();
+    try {
+      result = result.normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+    } catch (err) {
+      // pas grave si l'accent reste, le slug fonctionne quand même
+    }
+    result = result
+      .replace(/^\s+|\s+$/g, '')
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/(^-|-$)/g, '');
+    return result;
+  }
+
+  function extractPrice(text) {
+    if (!text) return 0;
+    var digits = text.replace(/[^0-9]/g, '');
+    return digits ? parseInt(digits, 10) : 0;
+  }
+
+  productCards.forEach(function (card) {
+    card.removeAttribute('href');
+
+    var nameEl = card.querySelector('h3');
+    var priceEl = card.querySelector('.cat-price');
+    var imgEl = card.querySelector('.cat-icon img');
+
+    var name = nameEl ? nameEl.textContent.replace(/^\s+|\s+$/g, '') : 'Produit';
+    var priceText = priceEl ? priceEl.textContent.replace(/^\s+|\s+$/g, '') : '';
+    var productId = (card.getAttribute('data-product-id')) || slugify(name);
+
+    var addBtn = document.createElement('button');
+    addBtn.type = 'button';
+    addBtn.className = 'cat-add-btn';
+    addBtn.textContent = 'Ajouter au panier';
+    addBtn.setAttribute('aria-label', 'Ajouter ' + name + ' au panier');
+
+    addBtn.onclick = function (e) {
+      if (e && e.preventDefault) { e.preventDefault(); }
+      if (e && e.stopPropagation) { e.stopPropagation(); }
+
+      var product = {
+        id: productId,
+        name: name,
+        price: extractPrice(priceText),
+        image: imgEl ? imgEl.getAttribute('src') : ''
+      };
+
+      window.addToCart(product.id, 1, product);
+      return false;
+    };
+
+    card.appendChild(addBtn);
+  });
+
+  /* -----------------------------------------------------------
+     3. FORMULAIRE DE DEVIS
+     Envoi via Web3Forms (aucun serveur PHP nécessaire) puis
+     ouverture de WhatsApp avec le récapitulatif du panier.
+  ----------------------------------------------------------- */
+  var devisForm = document.getElementById('devis-form');
+  var devisInput = document.getElementById('devis-input');
+  var devisStatus = document.getElementById('devis-status');
+
+  var WEB3FORMS_ACCESS_KEY = 'a2c95bc9-495e-4a01-ba0d-f25edd83c8c0';
+  var WHATSAPP_NUMBER = '2290147282166';
+
+  function showDevisStatus(message, isError) {
+    if (!devisStatus) return;
+    devisStatus.textContent = message;
+    devisStatus.classList.remove('sr-only');
+    devisStatus.classList.toggle('is-error', !!isError);
+    devisStatus.classList.toggle('is-success', !isError);
+  }
+
+  function getResumePanierTexte() {
+    var items = window.getCart ? window.getCart() : [];
+    if (!items.length) {
+      return 'Aucun article ajouté au panier avant la demande de devis.';
+    }
+    var lignes = items.map(function (item) {
+      var sousTotal = (item.price || 0) * (item.quantity || 1);
+      return item.name + ' x' + item.quantity + ' = ' + sousTotal.toLocaleString() + ' FCFA';
+    });
+    var total = items.reduce(function (sum, item) {
+      return sum + (item.price || 0) * (item.quantity || 1);
+    }, 0);
+    lignes.push('');
+    lignes.push('TOTAL : ' + total.toLocaleString() + ' FCFA');
+    return lignes.join('\n');
+  }
+
+  function getWhatsAppMessage(contact) {
+    var items = window.getCart ? window.getCart() : [];
+    var message = 'Bonjour, je souhaite un devis (' + contact + ').%0A%0AMon panier :%0A';
+    if (!items.length) {
+      message += 'Aucun article ajouté au panier.';
+    } else {
+      items.forEach(function (item) {
+        var sousTotal = (item.price || 0) * (item.quantity || 1);
+        message += '- ' + item.name + ' x' + item.quantity + ' (' + sousTotal.toLocaleString() + ' FCFA)%0A';
+      });
+      var total = items.reduce(function (sum, item) {
+        return sum + (item.price || 0) * (item.quantity || 1);
+      }, 0);
+      message += '%0ATotal : ' + total.toLocaleString() + ' FCFA';
+    }
+    return message;
+  }
+
+  if (devisForm) {
+    devisForm.addEventListener('submit', function (e) {
+      e.preventDefault();
+
+      var contact = devisInput.value.trim();
+
+      if (contact === '') {
+        showDevisStatus('Merci de renseigner un email ou un numéro WhatsApp.', true);
+        devisInput.focus();
+        return;
+      }
+
+      var submitBtn = devisForm.querySelector('button[type="submit"]');
+      var originalLabel = submitBtn ? submitBtn.textContent : '';
+      if (submitBtn) {
+        submitBtn.disabled = true;
+        submitBtn.textContent = 'Envoi en cours…';
+      }
+
+      fetch('https://api.web3forms.com/submit', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+        body: JSON.stringify({
+          access_key: WEB3FORMS_ACCESS_KEY,
+          subject: 'Nouvelle demande de devis - construiten1clic',
+          contact: contact,
+          message: getResumePanierTexte()
+        })
+      })
+        .catch(function () {
+          // on continue quand même vers WhatsApp même si l'email échoue
+        })
+        .finally(function () {
+          showDevisStatus('Merci ! Votre demande de devis a bien été envoyée, nous revenons vers vous sous 24h.', false);
+          devisForm.reset();
+
+          if (submitBtn) {
+            submitBtn.disabled = false;
+            submitBtn.textContent = originalLabel;
+          }
+
+          var texte = getWhatsAppMessage(contact);
+          window.open('https://wa.me/' + WHATSAPP_NUMBER + '?text=' + texte, '_blank');
+        });
+    });
+  }
+
+  /* -----------------------------------------------------------
+     4. HEADER : ombre au scroll
+  ----------------------------------------------------------- */
+  var mainHeader = document.querySelector('header.main');
+
+  function handleHeaderScroll() {
+    if (!mainHeader) return;
+    if (window.scrollY > 8) {
+      mainHeader.classList.add('scrolled');
+    } else {
+      mainHeader.classList.remove('scrolled');
+    }
+  }
+
+  window.addEventListener('scroll', handleHeaderScroll, { passive: true });
+  handleHeaderScroll();
+
+  /* -----------------------------------------------------------
+     5. LIENS D'ANCRAGE (catégories, devis)
+  ----------------------------------------------------------- */
+  document.querySelectorAll('a[href^="#"]').forEach(function (link) {
+    link.addEventListener('click', function () {
+      var targetId = link.getAttribute('href').slice(1);
+      var target = document.getElementById(targetId);
+      if (target) {
+        target.setAttribute('tabindex', '-1');
+        target.addEventListener('blur', function handleBlur() {
+          target.removeAttribute('tabindex');
+          target.removeEventListener('blur', handleBlur);
+        });
+        setTimeout(function () {
+          target.focus({ preventScroll: true });
+        }, 400);
+      }
+    });
+  });
+
+});
+
+</script>
 </body>
 </html>
+
